@@ -32,20 +32,27 @@
 
 typedef struct _cov_t cov_t;
 
-cov_t *cov_init(int bin_size);
+cov_t *cov_init();
 void cov_destroy(cov_t *cov);
 
+/*
+    Note that cov_insert() cannot be called after cov_n() or cov_get()
+ */
 void cov_insert(cov_t *cov, int32_t rid, int32_t beg, int32_t end);
 
-int cov_nrid(cov_t *cov);                   // number of chromosomes
-int cov_nbin(cov_t *cov, int32_t rid);      // number of bins on the chromosome
+/*
+    Get the number of bins, same as dist_get()
+ */
+int cov_n(cov_t *cov);
 
 /*
-   cov_get() 
+   cov_get(), same as dist_get()
    @idx:        from the interval [0,cov_n-1]
    @beg,end:    [beg,end)
+   
+   Returns the number of sites in the bin
  */
-uint16_t cov_get(cov_t *cov, int32_t rid, int32_t bin, uint32_t *beg, uint32_t *end);
+uint64_t cov_get(cov_t *cov, uint32_t idx, uint32_t *beg, uint32_t *end);
 
 #endif
 

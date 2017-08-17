@@ -23,7 +23,7 @@ ALL_LIBS     = -lm -lz -ldl $(LIBS)
 
 EXTRA_CPPFLAGS = -I. -I$(HTSDIR)
 
-OBJS = main.o dist.o cov.o
+OBJS = bxcheck.o dist.o cov.o
 
 .SUFFIXES:.c .o
 .PHONY:all
@@ -33,12 +33,15 @@ force:
 .c.o:
 	$(CC) $(CFLAGS) $(EXTRA_CPPFLAGS) $(ALL_CPPFLAGS) -c -o $@ $<
 
-main.o: main.c $(htslib_sam_h) $(htslib_khash_h)
+bxcheck.o: bxcheck.c cov.h dist.h $(htslib_sam_h) $(htslib_khash_h)
 dist.o: dist.c dist.h
-cov.o: cov.c cov.h
+cov.o: cov.c cov.h rbuf.h dist.h
 
 bxcheck: $(HTSLIB) $(OBJS)
 	$(CC) $(ALL_LDFLAGS) -o $@ $(OBJS) $(HTSLIB) -lpthread $(HTSLIB_LIBS) $(GSL_LIBS) $(ALL_LIBS)
+
+bxreads: $(HTSLIB) bxreads.c
+	$(CC) $(CFLAGS) $(EXTRA_CPPFLAGS) $(ALL_CPPFLAGS) $(ALL_LDFLAGS) -o $@ bxreads.c $(HTSLIB) -lpthread $(HTSLIB_LIBS) $(GSL_LIBS) $(ALL_LIBS)
 
 clean:
 	-rm -f gmon.out *.o *~ $(PROG)

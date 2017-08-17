@@ -23,6 +23,38 @@
    THE SOFTWARE.
 
  */
+/*
+    Logarithmic binning
+
+    Example of usage:
+
+        // Initialize, make the binning exact up to 10^4, then add a log-step
+        dist_t *dist = dist_init(4);
+
+        // Insert values
+        int i;
+        for (i=0; i<1e6; i++)
+            dist_insert(dist, i);
+
+        // Number of bins used
+        int n = dist_n(dist);
+
+        // Now print the distribution
+        uint32_t beg, end;
+        for (i=0; i<n; i++)
+        {
+            // Raw count in the bin. The boundaries beg,end are optional, 
+            // and can be used to plot correctly the density
+            uint64_t cnt = dist_get(dist, i, &beg, &end);
+            if ( !cnt ) continue;
+
+            // Print the interval, count and density
+            printf("%u\t%u\t%"PRIu64"\t%f\n", beg, end, cnt, (double)cnt/(end-beg));
+        }
+
+        // Clean up
+        dist_destroy(dist);
+ */
 
 #ifndef __DIST_H__
 #define __DIST_H__

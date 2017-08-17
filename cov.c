@@ -26,65 +26,115 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include <htslib/hts.h>
 #include "cov.h"
-
-typedef struct
-{
-    int nbin, mbin;
-    uint16_t *bin;
-}
-bins_t;
+#include "rbuf.h"
+#include "dist.h"
 
 struct _cov_t
 {
-    int bin_size;
-    int nrid;
-    bins_t *dat;
+    rbuf_t rbuf;    // metadata for the round buffer pileup
+    uint32_t *plp;  // pileup data
+    int
+        rid,        // previous rid, -1 on init
+        off;        // first idx in rbuf corresponds to this coordinate (0-based)
+    dist_t *dist;   // coverage histogram
 };
 
-cov_t *cov_init(int bin_size)
+cov_t *cov_init()
 {
     cov_t *cov = (cov_t*) calloc(1,sizeof(cov_t));
-    cov->bin_size = bin_size;
+    cov->dist = dist_init(4);
+    cov->rid  = -1;
     return cov;
 }
 
 void cov_destroy(cov_t *cov)
 {
-    int i;
-    for (i=0; i<cov->nrid; i++) free(cov->dat[i].bin);
-    free(cov->dat);
+    free(cov->plp);
+    dist_destroy(cov->dist);
     free(cov);
+}
+
+void _cov_flush(cov_t *cov)
+{
+    int iplp;
+    while ( (iplp=rbuf_shift(&cov->rbuf)) >=0 )
+    {
+        if ( cov->plp[iplp] ) dist_insert(cov->dist, cov->plp[iplp]);
+        cov->plp[iplp] = 0;
+    }
+    cov->off = 0;
 }
 
 void cov_insert(cov_t *cov, int32_t rid, int32_t beg, int32_t end)
 {
-    int i;
-    if ( rid+1 > cov->nrid )
+    assert( beg <= end );
+
+    int plp_size = (end - beg + 1)*10;
+    if ( cov->rbuf.m < plp_size )
     {
-        cov->dat = (bins_t*) realloc(cov->dat, sizeof(bins_t)*(rid+1));
-        for (i=cov->nrid; i<=rid; i++)
-            memset(cov->dat + cov->nrid, 0, sizeof(bins_t)*(rid + 1 - cov->nrid));
-        cov->nrid = rid+1;
+        if ( !cov->rbuf.m )
+        {
+            rbuf_init(&cov->rbuf, plp_size);
+            cov->plp = (uint32_t*) calloc(plp_size, sizeof(*cov->plp));
+        }
+        else
+            rbuf_expand0(&cov->rbuf, uint32_t, plp_size, cov->plp);
     }
-    bins_t *dat = &cov->dat[rid];
-    int ibeg = beg / cov->bin_size;
-    int iend = end / cov->bin_size;
-    hts_expand0(uint16_t, iend+1, dat->mbin, dat->bin);
-    for (i=ibeg; i<=iend; i++) 
-        if ( dat->bin[i] < 65535 ) dat->bin[i]++;
-    if ( iend >= dat->nbin ) dat->nbin = iend+1;
+
+    if ( rid != cov->rid )
+    {
+        _cov_flush(cov);
+        cov->rid = rid;
+    }
+
+    int iplp = -1, ioff = 0;
+    while ( rbuf_next(&cov->rbuf,&iplp) )
+    {
+        assert( cov->off + ioff <= beg );   // unsorted!
+        if ( cov->off + ioff == beg ) break;
+        if ( cov->plp[iplp] ) dist_insert(cov->dist, cov->plp[iplp]);
+        cov->plp[iplp] = 0;
+        ioff++;
+    }
+    if ( ioff ) 
+    {
+        rbuf_shift_n(&cov->rbuf, ioff);
+        cov->off += ioff;
+    }
+
+    // debugging sanity checks
+    if ( !cov->rbuf.n ) 
+    {
+        cov->off = beg;
+        assert( cov->plp[cov->rbuf.f]==0 );
+    }
+    else
+        assert( cov->off <= beg );
+
+    int ibeg, iend, i;
+    if ( end - cov->off >= cov->rbuf.n ) rbuf_append_n(&cov->rbuf, end - cov->off + 1);
+    ibeg = rbuf_kth(&cov->rbuf, beg - cov->off);
+    iend = rbuf_kth(&cov->rbuf, end - cov->off);
+    if ( ibeg > iend )
+    {
+        for (i=ibeg; i<cov->rbuf.m; i++) cov->plp[i]++;
+        ibeg = 0;
+    }
+    for (i=ibeg; i<=iend; i++) cov->plp[i]++;
 }
 
-int cov_nrid(cov_t *cov) { return cov->nrid; }
-int cov_nbin(cov_t *cov, int32_t rid) { return cov->dat[rid].nbin; }
-
-uint16_t cov_get(cov_t *cov, int32_t rid, int32_t bin, uint32_t *beg, uint32_t *end)
+int cov_n(cov_t *cov)
 {
-    if ( beg ) *beg = cov->bin_size * bin;
-    if ( end ) *end = cov->bin_size * (bin + 1);
-    return cov->dat[rid].bin[bin];
+    if (cov->rbuf.n ) _cov_flush(cov);
+    return dist_n(cov->dist);
 }
 
+uint64_t cov_get(cov_t *cov, uint32_t idx, uint32_t *beg, uint32_t *end)
+{
+    if ( cov->rbuf.n ) _cov_flush(cov);
+    return dist_get(cov->dist, idx, beg, end);
+}
 
