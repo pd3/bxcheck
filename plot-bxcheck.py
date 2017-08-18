@@ -45,12 +45,14 @@ while len(args):
 if dir==None: usage()
 
 color = [
-    '#d43f3a',   # coral red
-    '#06abb4',   # royal blue
-
+    '#E24A33', # ggplot red
+    '#777777', # ggplot gray
+#    '#348ABD', # ggplot blue
+#    '#FBC15E', # ggplot orange
+#    '#d43f3a',   # coral red
+#    '#06abb4',   # royal blue
 #    '#a7c65c',   # aloe
 #    '#ee4789',   # pink
-    
 #    '#a7c65c',   # aloe
 #    '#2e5251',   # pine
 ]
@@ -122,7 +124,6 @@ dists2 = \
     },
 }
 
-
 import matplotlib as mpl
 from matplotlib.image import BboxImage
 from matplotlib.transforms import Bbox, TransformedBbox
@@ -130,6 +131,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 import csv, os, numpy, base64
 csv.register_dialect('tab', delimiter='\t', quoting=csv.QUOTE_NONE)
+plt.style.use('ggplot')
 
 try:
     os.makedirs(dir)
@@ -199,7 +201,7 @@ def plot_dist(dist):
     if 'ylabel' in dist: ax1.set_ylabel(dist['ylabel'])
     if 'xlabel' in dist: ax1.set_xlabel(dist['xlabel'])
 
-    plt.subplots_adjust(bottom=0.15)
+    plt.subplots_adjust(bottom=0.17)
     plt.savefig(dir+'/'+dist['img']+'.'+itype)
     plt.close()
 
@@ -283,7 +285,7 @@ def plot_dist2(dist):
         ax1.set_title(dist['title'])
     if 'ysci' in dist and dist['ysci']:
         ax1.ticklabel_format(style='sci', scilimits=(-2,2), axis='y')
-    plt.subplots_adjust(bottom=0.15)
+    plt.subplots_adjust(bottom=0.17)
     if itype!='png': plt.savefig(dir+'/'+dist['img']+'.'+itype)
     plt.savefig(dir+'/'+dist['img']+'.png')
     plt.close()
@@ -346,7 +348,7 @@ def percent(part, total):
 
 def embed_image(name):
     fh = open(dir+'/'+name+'.'+itype, "rb")
-    return "<img style='width:100%;margin-top:1em;margin-bottom:1em;' src='data:image/png;base64," + base64.b64encode(fh.read()) + "'>"
+    return "<img class='plot' src='data:image/png;base64," + base64.b64encode(fh.read()) + "'>"
 
 help_id = 0
 def help_text(text):
@@ -422,20 +424,54 @@ def write_html(fname, dists):
     fh = open(fname,"w")
     fh.write("""<!DOCTYPE html><html>
         <style>
+            body { 
+                background: #efefef; 
+                text-align: center; 
+                padding: 0px;
+                margin: 0px;
+            }
+            #container { 
+                background: #fff;
+                display: inline-block;
+                height: 100%;
+                min-height: 100vh;
+                padding: 0em 2em 0em 2em;
+                margin: 0px;
+            }
             .column {
+                margin-top:1em;
+                background: #fff;
                 clear: left;
-                width: 25%;
+                width: 490px;
                 display: inline-block;
                 vertical-align: top;
             }
             .box {
                 padding: 0.5em;
+                padding-bottom: 1em;
                 margin: 0.5em;
                 margin-bottom: 1em;
                 border: solid 1px #ddd;
                 border-radius: 0.2em;
             }
+            .plot {
+                width:100%;
+            }
+            div.sep {
+                margin-top:1em;
+                margin-bottom:1em;
+                margin-left: auto;
+                margin-right: auto;
+                width: 80%; 
+                height: 1px; 
+                background: #ddd;
+                overflow: hidden;
+            }
+            div.topsep {
+                margin-top:2em;
+            }
             h2 {
+                color: #E24A33;
             }
             dt {
                 font-weight: bold;
@@ -480,15 +516,6 @@ def write_html(fname, dists):
                 margin: auto;
                 text-align: right;
             }
-            div.sep {
-                margin:2em;
-                margin-left: auto;
-                margin-right: auto;
-                width: 80%; 
-                height: 1px; 
-                background: #ddd;
-                overflow: hidden;
-            }
         </style>
         <script type="text/javascript">
             function toggle_help(e, id)
@@ -499,7 +526,7 @@ def write_html(fname, dists):
             }
         </script>
         <body> 
-            <div style="width:100%; text-align:center;">
+            <div id="container">
             <span class="column">
                 <div class="box">
                     """+ help_text("""
@@ -543,7 +570,7 @@ def write_html(fname, dists):
                             + percent(dat['SN']['n_excluded_flag'],dat['SN']['n_all_reads']) + """</tr>
                         """ + filters + """
                     </table>
-                    <div class='sep'></div> """
+                    <div class='sep topsep'></div> """
                     + embed_image(dat['cov_reads']['img']) + """ <div class='sep'></div> """
                     + embed_image(dat['dist_sclip']['img']) + """</div>
             </span>
@@ -576,7 +603,7 @@ def write_html(fname, dists):
                             + bignum(dat['SN']['n_barcodes_excluded_min_reads']) + """<td>"""
                             + percent(dat['SN']['n_barcodes_excluded_min_reads'],dat['SN']['n_all_barcodes']) +"""</tr>
                     </table>
-                    <div class='sep'></div> """
+                    <div class='sep topsep'></div> """
                     + embed_image(dat['bx_reads']['img']) + """ <div class='sep'></div> """
                     + embed_image(dat['FRAG_NREADS']['img']) + """</div>
                 <div class="box">
