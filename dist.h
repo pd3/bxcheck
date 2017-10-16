@@ -76,9 +76,11 @@ void dist_destroy(dist_t *dist);
 int dist_n(dist_t *dist);
 
 /*
-    dist_insert() - insert new value
+    dist_insert()   - insert new value
+    dist_insert_n() - insert new value n times
  */
 uint32_t dist_insert(dist_t *dist, uint32_t value);
+uint32_t dist_insert_n(dist_t *dist, uint32_t value, uint32_t cnt);
 
 /*
    dist_get() 

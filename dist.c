@@ -86,6 +86,13 @@ uint32_t dist_insert(dist_t *dist, uint32_t value)
     dist->bins[ibin]++;
     return ibin;
 }
+uint32_t dist_insert_n(dist_t *dist, uint32_t value, uint32_t cnt)
+{
+    if ( !cnt ) return 0;
+    int ibin = dist_insert(dist, value);
+    dist->bins[ibin] += cnt - 1;
+    return ibin;
+}
 
 uint64_t dist_get(dist_t *dist, uint32_t idx, uint32_t *beg, uint32_t *end)
 {
