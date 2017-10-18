@@ -542,9 +542,11 @@ def parse_file(fname):
             if 'xdat' not in dat[img]:
                 dat[img]['xdat'] = []
                 dat[img]['ydat'] = []
+                dat[img]['yraw'] = []
             dat[img]['xdat'].append(float(row[1]))
             if 'plot_density' in dists[img]:
                 dat[img]['ydat'].append(float(row[3])/(float(row[2])-float(row[1])))
+                dat[img]['yraw'].append(float(row[3]))
             else:
                 dat[img]['ydat'].append(float(row[3]))
             done = True
@@ -563,9 +565,11 @@ def parse_file(fname):
             if 'xdat' not in dat[img][dataset]:
                 dat[img][dataset]['xdat'] = []
                 dat[img][dataset]['ydat'] = []
+                dat[img][dataset]['yraw'] = []
             dat[img][dataset]['xdat'].append(float(row[1]))
             if 'plot_density' in dists2[img]:
                 dat[img][dataset]['ydat'].append(float(row[3])/(float(row[2])-float(row[1])))
+                dat[img][dataset]['yraw'].append(float(row[3]))
             else:
                 dat[img][dataset]['ydat'].append(float(row[2]))
             done = True
@@ -597,10 +601,10 @@ def parse_file(fname):
     tmp = 0
     dat['SN']['N50'] = 0
     if 'frag_size' in dat:
-        for i in range(len(dat['frag_size']['xdat'])): tmp += dat['frag_size']['xdat'][i]*dat['frag_size']['ydat'][i]
+        for i in range(len(dat['frag_size']['xdat'])): tmp += dat['frag_size']['xdat'][i]*dat['frag_size']['yraw'][i]
         tmp *= 0.5
         for i in range(len(dat['frag_size']['xdat'])): 
-            tmp -= dat['frag_size']['xdat'][i]*dat['frag_size']['ydat'][i]
+            tmp -= dat['frag_size']['xdat'][i]*dat['frag_size']['yraw'][i]
             if tmp > 0: continue
             dat['SN']['N50'] = int(dat['frag_size']['xdat'][i])
             break
@@ -613,13 +617,13 @@ def parse_file(fname):
     if 'frag_size' in dat:
         genome_len = float(dat['LM']['genome_length'])
         for i in range(len(dat['frag_size']['xdat'])-1,-1,-1):
-            tmp += dat['frag_size']['xdat'][i]*dat['frag_size']['ydat'][i]
+            tmp += dat['frag_size']['xdat'][i]*dat['frag_size']['yraw'][i]
             if tmp / genome_len < 10: continue
             dat['SN']['N10x'] = int(dat['frag_size']['xdat'][i])
             break
         tmp = 0
         for i in range(len(dat['frag_size']['xdat'])-1,-1,-1):
-            tmp += dat['frag_size']['xdat'][i]*dat['frag_size']['ydat'][i]
+            tmp += dat['frag_size']['xdat'][i]*dat['frag_size']['yraw'][i]
             if tmp / genome_len < 20: continue
             dat['SN']['N20x'] = int(dat['frag_size']['xdat'][i])
             break
