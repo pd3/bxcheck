@@ -20,6 +20,7 @@ def usage():
     sys.exit(1)
 
 
+reads_per_fragment_ylim = 0.95
 inputs = None
 replot = True
 output = None
@@ -219,7 +220,8 @@ def color_values(dat,desc={}):
         td = 'td_'+key
         dat[td] = []
         for i in range(len(dat[key])):
-            val = (dat[key][i]-float(min))/(max - float(min))
+            if float(min)==max: val = 0.5
+            else: val = (dat[key][i]-float(min))/(max - float(min))
             if key in desc: val = 1 - val
             if val <= 0.5:
                 col = 'rgb(226,74,51,%.1f)' % (2*0.8*(0.5-val) + 0.1)  # red
@@ -256,12 +258,16 @@ def write_help_text(fh):
                             <dt>Fragment length against Nx coverage</dt>
                                 <dd>N10x fragment length calculated for all dephts.
                                 </dd>
-                            <dt>Number of fragments (density) againsts fragment length</dt>
+                            <dt>Number of fragments (density) against Fragment length</dt>
                                 <dd>Fragment size distribution plotted as density. 
                                 The fragment size is calculated as <i>D + D/(N-1)</i>, where <i>N</i> is the number of read pairs
                                 within the fragment and <i>D</i> is the distance between the first and the last pair. All read pairs
                                 must map to the same chromosome with the maximum gap of """ + bignum(dat[dat.keys()[0]].get('max_frag_gap','100000')) + """ bp.
                                 Only fragments with more than """+ dat[dat.keys()[0]].get('min_readpairs_per_fragment','2') +""" read pairs are included.
+                                </dd>
+                            <dt>Cumulative fraction of pairs against Reads pairs per fragment</dt>
+                                <dd>Cumulative frequency of read pairs in fragments with this many read pairs per fragment.
+                                The data was truncated to include at least """ + str(100*reads_per_fragment_ylim) + """% of read pairs.
                                 </dd>
                         </dl>
                     """))
@@ -300,6 +306,36 @@ def ymax(xdat,ydat,xlim):
         ymax = max(ymax,ydat[i])
     return ymax
 
+def xlim(data,xlim):
+    if type(xlim).__name__ != 'str': return xlim
+    match = re.search(r'^([^%]+)%',xlim)
+    if not match: return xlim
+    threshold = float(match.group(1))/100.
+    xmin = 0
+    for dat in data:
+        tot = 0
+        for i in range(len(dat['xdat'])): tot += dat['ydat'][i]
+        sum = 0
+        for i in range(len(dat['xdat'])): 
+            sum += dat['ydat'][i]
+            if sum / tot > threshold:
+                if xmin < dat['xdat'][i]: xmin = dat['xdat'][i]
+                break
+    return xmin
+
+def ydat_to_cdist(data,xlim):
+    for dat in data:
+        tot = 0
+        for i in range(len(dat['xdat'])): tot += dat['ydat'][i]
+        sum = 0
+        for i in range(len(dat['xdat'])): 
+            sum += dat['ydat'][i]
+            dat['ydat'][i] = sum/tot
+            if sum / tot > xlim:
+                dat['xdat'] = dat['xdat'][0:i+1]
+                dat['ydat'] = dat['ydat'][0:i+1]
+                break
+
 def smooth_dist(dist):
     xdat = []
     ydat = []
@@ -329,6 +365,12 @@ def plot_dist(dat, names, args):
     ax1.get_yaxis().tick_left()
     ax1.spines['bottom'].set_color('#aaaaaa')
     ax1.spines['left'].set_color('#aaaaaa')
+
+    if 'xlim' in args: 
+        if args['xlim'][0]!=None: args['xlim'][0] = xlim(dat, args['xlim'][0])
+        if args['xlim'][1]!=None: args['xlim'][1] = xlim(dat, args['xlim'][1])
+    if 'cdist' in args:
+        ydat_to_cdist(dat,args['cdist'])
 
     ylim = 0
     alpha = 0.8
@@ -388,8 +430,8 @@ def write_html(fname,dat):
             +out['td_bx'][i]+percent(dat[name]['nwr_reads_bx'],dat[name]['nraw_reads'])
             +out['td_bad'][i]+percent(dat[name]['n_excluded'],dat[name]['n_all_reads'])
             +out['td_nfrag'][i]+percent(dat[name]['n_reads_in_good_fragments'],dat[name]['n_all_reads'])
-            +out['td_n50'][i]+bignum(out['n50'][i])
-            +out['td_n10x'][i]+bignum(out['n10x'][i])
+            +out['td_n50'][i]+bignum(int(out['n50'][i]))
+            +out['td_n10x'][i]+bignum(int(out['n10x'][i]))
             )
     fh.write('</table>')
 
@@ -397,6 +439,9 @@ def write_html(fname,dat):
     fh.write(""" <div class='topsep sep'></div> """ + embed_image(img));
 
     img = plot_dist([dat[name]['frag_size_density'] for name in names],names,{'xlabel':'Fragment length','ylabel':"Number of fragments\n(density)",'xlog':1,'ylog':1,'xlim':[100,None],'handler':'smooth_dist'});
+    fh.write(""" <div class='sep'></div> """ + embed_image(img));
+
+    img = plot_dist([dat[name]['frag_npairs'] for name in names],names,{'xlabel':'Read pairs per fragment','ylabel':"Cumulative fraction of pairs",'cdist':reads_per_fragment_ylim});
     fh.write(""" <div class='sep'></div> """ + embed_image(img));
 
     write_html_footer(fh)
@@ -431,10 +476,13 @@ def parse_file(dat,line):
         if row[0]=='SN' and row[1]=='nwr_reads_bx': addto(dat,name,'nwr_reads_bx',int(row[2])); continue
         if row[0]=='SN' and row[1]=='n_excluded': addto(dat,name,'n_excluded',int(row[2])); continue
         if row[0]=='SN' and row[1]=='n_all_reads': addto(dat,name,'n_all_reads',int(row[2])); continue
-        if row[0]=='FRAG_NREADS': addto(dat,name,'n_reads_in_good_fragments',2*int(row[1])*int(row[3])); continue
+        if row[0]=='FRAG_NREADS': 
+            addto(dat,name,'n_reads_in_good_fragments',2*float(row[1])*float(row[3]))
+            appendto(dat,name,'frag_npairs',float(row[1]),2*float(row[1])*float(row[3]))
+            continue
         if row[0]=='FRAG_SIZE':
-            appendto(dat,name,'frag_size',int(row[1]),int(row[3]))
-            appendto(dat,name,'frag_size_density',int(row[1]),float(row[3])/(float(row[2])-float(row[1])))
+            appendto(dat,name,'frag_size',float(row[1]),float(row[3]))
+            appendto(dat,name,'frag_size_density',float(row[1]),float(row[3])/(float(row[2])-float(row[1])))
             continue
         if row[0]=='LM' and row[1]=='genome_length': set(dat,name,'genome_length',int(row[2])); continue
         if row[0]=='LM' and row[1]=='max_frag_gap': set(dat,name,'max_frag_gap',row[2]); continue

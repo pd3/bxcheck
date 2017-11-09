@@ -882,11 +882,11 @@ def write_stats(dat):
                                 </dd>
                             <dt>Read pairs per fragment</dt>
                                 <dd>Read pair frequency in fragments with this many read pairs per fragment.
-                                The x axis range was set to include """ + str(100*dat.get('FRAG_NREADS',{}).get('xlim',0)) + """% of the data.
+                                The x axis range was set to include """ + str(100*dat.get('frag_nreads',{}).get('xlim',0)) + """% of the data.
                                 </dd>
                             <dt>Fragment coverage</dt>
                                 <dd>Average depth within fragments. 
-                                The x axis range was set to include """ + str(100*dat.get('FRAG_COV',{}).get('xlim',0)) + """% of the data.
+                                The x axis range was set to include """ + str(100*dat.get('frag_cov',{}).get('xlim',0)) + """% of the data.
                                 </dd>
                         </dl>
                     """) +"""
