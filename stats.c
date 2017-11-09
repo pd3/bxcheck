@@ -113,7 +113,7 @@ typedef struct
     elem_t *elem;
     uint16_t exclude_flag, min_mq;
     uint64_t checksum_wr, checksum_ro;
-    double frag_len;                // expected fragment size, normally distributed
+    double max_frag_gap;
     int frag_len_prior;
     bxhash_t *bx_list;             // superset of expected barcodes
     htsFile *bam_fh;
@@ -305,7 +305,7 @@ static int analyze_fragments(args_t *args, elem_t *elem, int n)
     {
         ibeg = iend;
         for (iend=ibeg+1; iend<n; iend++)
-            if ( elem[iend].pos - elem[iend-1].pos > MAX_FRAG_GAP ) break;
+            if ( elem[iend].pos - elem[iend-1].pos > args->max_frag_gap ) break;
         int nreads = iend - ibeg;
         if ( nreads < args->min_reads_per_fragment ) continue;
 
@@ -430,7 +430,7 @@ static void report(args_t *args)
     printf("LM\tgenome_length\t%"PRIu64"\n", glen);
     printf("LM\tflags\t0x%x\n", args->exclude_flag);
     printf("LM\tminMQ\t%d\n", args->min_mq);
-    printf("LM\tmax_frag_gap\t%.0f\n", MAX_FRAG_GAP);
+    printf("LM\tmax_frag_gap\t%.0f\n", args->max_frag_gap);
     printf("LM\tmin_readpairs_per_fragment\t%d\n", args->min_reads_per_fragment);
     printf("SN\tn_all_reads\t%"PRIu64"\n", args->all.nreads + args->nno_bx);
     printf("SN\tn_bx_reads\t%"PRIu64"\n", args->all.nreads);
@@ -662,7 +662,7 @@ static void usage(void)
     printf("        --prior-norm                Fragment lengths distributed normally\n");
     printf("    -b, --pairs-per-barcode INT     Minimum number of good read pairs per barcode [2]\n");
     printf("    -e, --exclude-flag INT|STR      Reads to exclude [UNMAP,MUNMAP,SECONDARY,QCFAIL,DUP,SUPPLEMENTARY]\n");
-    printf("    -f, --fragment-size NUMBER      Expected fragment length, assuming normal distribution [5e4]\n");
+    printf("    -g, --max-fragment-gap NUMBER   Maximum gap within a fragment  [%g]\n",MAX_FRAG_GAP);
     printf("    -l, --barcodes-list FILE        List of 10x barcodes\n");
     printf("    -m, --mapping-qual INT          Minimum mapping quality for the fragment size distribution [20]\n");
     printf("    -n, --n-temp-files INT          Create up to INT temporary files while sorting by barcode [100]\n");
@@ -681,11 +681,11 @@ int main_stats(int argc, char *argv[])
     args->exclude_flag = BAM_FUNMAP|BAM_FMUNMAP|BAM_FSECONDARY|BAM_FQCFAIL|BAM_FDUP|BAM_FSUPPLEMENTARY;
     args->tmp_dir = "/tmp/bxcheck.XXXXXX";
     args->nfiles = 100;
-    args->frag_len = 5e4;
     args->max_soft_clips = INT32_MAX;
     args->min_barcode_pairs = 2;
     args->min_reads_per_fragment = 2;
     args->min_read_spacing = 10;
+    args->max_frag_gap = MAX_FRAG_GAP;
     args->argc = argc;
     args->argv = argv;
 
@@ -715,15 +715,12 @@ int main_stats(int argc, char *argv[])
     {
         {"help", no_argument, NULL, 'h'},
         {"debug", no_argument, NULL, 3},
-        //{"prior-norm", no_argument, NULL, 4},
-        //{"prior-exp", no_argument, NULL, 5},
-        //{"prior-fixed", no_argument, NULL, 6},
         {"exclude-flag", required_argument, NULL, 'e'},
         {"pairs-per-barcode", required_argument, NULL, 'b'},
         {"reads-per-fragment", required_argument, NULL, 'r'},
         {"read-spacing", required_argument, NULL, 'R'},
         {"max-soft-clips", required_argument, NULL, 's'},
-        {"fragment-size", required_argument, NULL, 'f'},
+        {"max-fragment-gap", required_argument, NULL, 'g'},
         {"mapping-qual", required_argument, NULL, 'm'},
         {"n-temp-files", required_argument, NULL, 'n'},
         {"temp-dir", required_argument, NULL, 't'},
@@ -733,22 +730,13 @@ int main_stats(int argc, char *argv[])
 
     char *tmp;
     int opt;
-    while ( (opt=getopt_long(argc,argv,"?hm:n:t:e:s:b:r:R:l:",loptions,NULL))>0 )
+    while ( (opt=getopt_long(argc,argv,"?hm:n:t:e:s:b:r:R:l:g:",loptions,NULL))>0 )
     {
         switch (opt)
         {
             case  3 :
                 args->debug = 1;
                 break;
-            //case  4 :
-            //    args->frag_len_prior = FRAG_LEN_NORM;
-            //    break;
-            //case  5 :
-            //    args->frag_len_prior = FRAG_LEN_EXP;
-            //    break;
-            //case  6 :
-            //    args->frag_len_prior = FRAG_LEN_FIXED;
-            //    break;
             case 'e': 
                 args->exclude_flag = bam_str2flag(optarg);
                 if ( args->exclude_flag<0 ) { fprintf(stderr,"Could not parse --exclude-flag %s\n", optarg); return 1; }
@@ -778,9 +766,9 @@ int main_stats(int argc, char *argv[])
                 args->min_barcode_pairs = strtod(optarg, &tmp); 
                 if ( tmp==optarg || *tmp ) error("Could not parse the argument: --pairs-per-barcode %s\n", optarg);
                 break;
-            case 'f': 
-                args->frag_len = strtod(optarg, &tmp); 
-                if ( tmp==optarg || *tmp ) error("Could not parse the argument: --fragment-size %s\n", optarg);
+            case 'g': 
+                args->max_frag_gap = strtod(optarg, &tmp); 
+                if ( tmp==optarg || *tmp ) error("Could not parse the argument: --max-fragment-gap %s\n", optarg);
                 break;
             case 'm': 
                 args->min_mq = strtol(optarg, &tmp, 10); 
