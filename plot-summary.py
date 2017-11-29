@@ -55,6 +55,15 @@ import matplotlib.pyplot as plt
 import os, numpy, base64, re
 plt.style.use('ggplot')
 
+mpl.rcParams['axes.color_cycle'] = [ '#E24A33','#348ABD','#8EBA42','#FBC15E','#988ED5','#777777','#FFB5B8' ]
+    # E24A33 : red
+    # 348ABD : blue
+    # 8EBA42 : green
+    # FBC15E : yellow
+    # 988ED5 : purple
+    # 777777 : gray
+    # FFB5B8 : pink
+
 #-------------------------
 
 def embed_image(name):
@@ -125,6 +134,9 @@ def write_html_header(fh):
             }
             dt {
                 font-weight: bold;
+            }
+            dt.graph {
+                color: """ + mpl.rcParams['axes.color_cycle'][1] + """
             }
             dd {
                 margin-bottom: 1em;
@@ -255,19 +267,22 @@ def write_help_text(fh):
                                 that point. Note that the genome length is determined from the BAM header as the sum of
                                 all contigs.
                                 </dd>
-                            <dt>Fragment length against Nx coverage</dt>
-                                <dd>N10x fragment length calculated for all dephts.
+                            <dt class='graph'>Cumulative fraction of pairs / Reads pairs per fragment</dt>
+                                <dd>Cumulative frequency of read pairs in fragments with this many read pairs per fragment.
+                                The data was truncated to include at least """ + str(100*reads_per_fragment_ylim) + """% of read pairs.
                                 </dd>
-                            <dt>Number of fragments (density) against Fragment length</dt>
+                            <dt class='graph'>Number of fragments (density) / Fragment length</dt>
                                 <dd>Fragment size distribution plotted as density. 
                                 The fragment size is calculated as <i>D + D/(N-1)</i>, where <i>N</i> is the number of read pairs
                                 within the fragment and <i>D</i> is the distance between the first and the last pair. All read pairs
                                 must map to the same chromosome with the maximum gap of """ + bignum(dat[dat.keys()[0]].get('max_frag_gap','100000')) + """ bp.
                                 Only fragments with more than """+ dat[dat.keys()[0]].get('min_readpairs_per_fragment','2') +""" read pairs are included.
                                 </dd>
-                            <dt>Cumulative fraction of pairs against Reads pairs per fragment</dt>
-                                <dd>Cumulative frequency of read pairs in fragments with this many read pairs per fragment.
-                                The data was truncated to include at least """ + str(100*reads_per_fragment_ylim) + """% of read pairs.
+                            <dt class='graph'>Sequenced bases / Fragment length</dt>
+                                <dd>Total number of sequence in fragments of given length.
+                                </dd>
+                            <dt class='graph'>Fragment length / Nx coverage</dt>
+                                <dd>Like N10x above, but calculated for all depths.
                                 </dd>
                         </dl>
                     """))
@@ -435,14 +450,17 @@ def write_html(fname,dat):
             )
     fh.write('</table>')
 
-    img = plot_dist([dat[name]['Nx'] for name in names],names,{'xlabel':'Nx coverage','ylabel':'Fragment length','xlim':[1,60]});
-    fh.write(""" <div class='topsep sep'></div> """ + embed_image(img));
+    img = plot_dist([dat[name]['frag_npairs'] for name in names],names,{'xlabel':'Read pairs per fragment','ylabel':"Cumulative fraction of pairs",'cdist':reads_per_fragment_ylim});
+    fh.write(""" <div class='sep'></div> """ + embed_image(img));
 
     img = plot_dist([dat[name]['frag_size_density'] for name in names],names,{'xlabel':'Fragment length','ylabel':"Number of fragments\n(density)",'xlog':1,'ylog':1,'xlim':[100,None],'handler':'smooth_dist'});
     fh.write(""" <div class='sep'></div> """ + embed_image(img));
 
-    img = plot_dist([dat[name]['frag_npairs'] for name in names],names,{'xlabel':'Read pairs per fragment','ylabel':"Cumulative fraction of pairs",'cdist':reads_per_fragment_ylim});
+    img = plot_dist([dat[name]['frag_size_seq'] for name in names],names,{'xlabel':'Fragment length','ylabel':"Sequenced bases",'xlog':1,'ylog':1,'xlim':[100,None],'handler':'smooth_dist'});
     fh.write(""" <div class='sep'></div> """ + embed_image(img));
+
+    img = plot_dist([dat[name]['Nx'] for name in names],names,{'xlabel':'Nx coverage','ylabel':'Fragment length','xlim':[1,60]});
+    fh.write(""" <div class='topsep sep'></div> """ + embed_image(img));
 
     write_html_footer(fh)
     fh.close()
@@ -483,6 +501,9 @@ def parse_file(dat,line):
         if row[0]=='FRAG_SIZE':
             appendto(dat,name,'frag_size',float(row[1]),float(row[3]))
             appendto(dat,name,'frag_size_density',float(row[1]),float(row[3])/(float(row[2])-float(row[1])))
+            continue
+        if row[0]=='FRAG_SIZE_SEQ':
+            appendto(dat,name,'frag_size_seq',float(row[1]),float(row[3])/(float(row[2])-float(row[1])))
             continue
         if row[0]=='LM' and row[1]=='genome_length': set(dat,name,'genome_length',int(row[2])); continue
         if row[0]=='LM' and row[1]=='max_frag_gap': set(dat,name,'max_frag_gap',row[2]); continue

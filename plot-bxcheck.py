@@ -943,7 +943,7 @@ def write_stats(dat):
                                 the maximum gap of """ + bignum(dat['LM']['max_frag_gap']) + """ bp.
                                 At least """ + dat['LM'].get('min_readpairs_per_fragment','2') + """ read pairs per fragment are required.
                                 </dd>
-                            <dt>Sequences bases against fragment length</dt>
+                            <dt>Sequenced bases against fragment length</dt>
                                 <dd>Total number of sequence in fragments of given length.
                                 </dd>
                             <dt>Number of fragments against fragment length</dt>
